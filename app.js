@@ -7,22 +7,43 @@ let view = "dashboard";
 let liveMatch = null;
 let modalActive = false;
 
+// --- Main render and navigation
 function render() {
   hideModal();
-  if (view === "dashboard") renderDashboard();
-  else if (view === "players") renderPlayers();
-  else if (view === "tournaments") renderTournaments();
-  else if (view === "stats") renderStats();
+  if (view === "dashboard")      { renderDashboard(); renderPageNav(); }
+  else if (view === "players")   { renderPlayers();  renderPageNav(); }
+  else if (view === "tournaments"){ renderTournaments(); renderPageNav(); }
+  else if (view === "stats")     { renderStats();    renderPageNav(); }
   else if (view === "live-match") renderLiveMatch();
-  setActiveNav();
-}
-function setActiveNav() {
-  ["dashboard","tournaments","players","stats"].forEach(v => {
-    document.getElementById("nav-"+v).classList.toggle("active",view===v);
-  });
 }
 
-// ==== Dashboard ====
+// --- NAVIGATION (two-row, in-page, just below "Top Players")
+function renderPageNav() {
+  const navHTML = `
+    <div class="page-nav">
+      <div class="page-nav-row">
+        <button id="nav-dashboard" class="${view === 'dashboard' ? 'active-nav' : ''}">Dashboard</button>
+        <button id="nav-stats"     class="${view === 'stats'     ? 'active-nav' : ''}">Stats</button>
+      </div>
+      <div class="page-nav-row">
+        <button id="nav-tournaments" class="${view === 'tournaments' ? 'active-nav' : ''}">Tournaments</button>
+        <button id="nav-players"     class="${view === 'players'     ? 'active-nav' : ''}">Players</button>
+      </div>
+    </div>
+  `;
+  let navContainer = document.getElementById('page-nav');
+  if (!navContainer) {
+    document.getElementById('app').insertAdjacentHTML("beforeend", '<div id="page-nav"></div>');
+    navContainer = document.getElementById('page-nav');
+  }
+  navContainer.innerHTML = navHTML;
+  document.getElementById('nav-dashboard').onclick   = ()=>{view="dashboard";render();};
+  document.getElementById('nav-tournaments').onclick = ()=>{view="tournaments";render();};
+  document.getElementById('nav-players').onclick     = ()=>{view="players";render();};
+  document.getElementById('nav-stats').onclick       = ()=>{view="stats";render();};
+}
+
+// --- Dashboard
 function renderDashboard() {
   document.getElementById('app').innerHTML = `
     <div class="dashboard">
@@ -59,6 +80,7 @@ function renderDashboard() {
         }
         </div>
       </section>
+      <div id="page-nav"></div>
     </div>
   `;
 }
@@ -69,7 +91,7 @@ function getTopPlayers() {
     .slice(0,5);
 }
 
-// ==== Tournament Creation & Match Schedule ====
+// --- Tournament Creation & Match Scheduling
 function openNewTournament() {
   showModal(`
     <h2>Create Tournament</h2>
@@ -151,7 +173,7 @@ function viewTournament(idx) {
   `);
 }
 
-// ==== Start Match (fixed version): opens live match window! ====
+// --- "Start Match" flow (modal + opens live match UI)
 function openStartMatch() {
   if (tournaments.length < 1) {
     alert("No tournaments available. Please create a tournament first.");
@@ -217,9 +239,8 @@ function openStartMatch() {
   updateMatchDropdown();
 }
 
-// ==== Live Match/Stats Update ====
+// --- Live Match UI
 function renderLiveMatch() {
-  // Defensive: If liveMatch is not set, go home!
   if (!liveMatch || typeof liveMatch.p1 === "undefined" || typeof liveMatch.p2 === "undefined") {
     view = "dashboard"; render(); return;
   }
@@ -297,7 +318,7 @@ function updateMatchStats(winner, loser) {
 }
 function endLiveMatch() { liveMatch = null; view = "dashboard"; render(); }
 
-// ==== Players Page ====
+// --- Players Page
 function renderPlayers() {
   document.getElementById('app').innerHTML = `
     <div class="content-page">
@@ -319,9 +340,11 @@ function renderPlayers() {
         `).join('')
       }`
     }
+    <div id="page-nav"></div>
     </div>
   `;
 }
+
 function openAddPlayer() {
   showModal(`
     <h2>Add New Player</h2>
@@ -349,7 +372,7 @@ function removePlayer(idx) {
   }
 }
 
-// ==== Tournaments Page ====
+// --- Tournaments Page
 function renderTournaments() {
   document.getElementById('app').innerHTML = `
     <div class="content-page">
@@ -370,11 +393,13 @@ function renderTournaments() {
           </div>
         `).join('')
       }
+      <div id="page-nav"></div>
     </div>
   `;
 }
 
-// ==== Stats Page ====
+
+// --- Stats Page
 function renderStats() {
   document.getElementById('app').innerHTML = `
     <div class="content-page">
@@ -410,11 +435,12 @@ function renderStats() {
         </ul>
         `
       }
+      <div id="page-nav"></div>
     </div>
   `;
 }
 
-// ==== Modal System ====
+// --- Modal
 function showModal(html="") {
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal').classList.remove('hidden');
@@ -429,11 +455,5 @@ function hideModal() {
   }
 }
 
-// ==== Binds ====
-document.getElementById('nav-dashboard').onclick = ()=>{view="dashboard";render();};
-document.getElementById('nav-players').onclick = ()=>{view="players";render();};
-document.getElementById('nav-tournaments').onclick = ()=>{view="tournaments";render();};
-document.getElementById('nav-stats').onclick = ()=>{view="stats";render();};
-document.getElementById('modal-bg').onclick = hideModal;
-
+// --- Start the app
 render();
