@@ -1,23 +1,18 @@
 function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 function load(key) { return JSON.parse(localStorage.getItem(key) || "[]"); }
-let players = load('beyblade_players');
-let tournaments = load('beyblade_tournaments');
 
+let players      = load('beyblade_players');
+let tournaments  = load('beyblade_tournaments');
 let view = "dashboard";
 let liveMatch = null;
 let modalActive = false;
 
-// --- Main render and navigation
-function render() {
-  hideModal();
-  if (view === "dashboard")      { renderDashboard(); renderPageNav(); }
-  else if (view === "players")   { renderPlayers();  renderPageNav(); }
-  else if (view === "tournaments"){ renderTournaments(); renderPageNav(); }
-  else if (view === "stats")     { renderStats();    renderPageNav(); }
-  else if (view === "live-match") renderLiveMatch();
+if (!players[0] || players.some(p => p.tournamentsWon === undefined)) {
+  players.forEach(p => p.tournamentsWon = p.tournamentsWon || 0);
+  save('beyblade_players', players);
 }
 
-// --- NAVIGATION (two-row, in-page, just below "Top Players")
+// --- Helper: Navigation ---
 function renderPageNav() {
   const navHTML = `
     <div class="page-nav">
@@ -43,46 +38,79 @@ function renderPageNav() {
   document.getElementById('nav-stats').onclick       = ()=>{view="stats";render();};
 }
 
-// --- Dashboard
+function render() {
+  hideModal();
+  if (view === "dashboard")      { renderDashboard(); renderPageNav(); }
+  else if (view === "players")   { renderPlayers();  renderPageNav(); }
+  else if (view === "tournaments"){ renderTournaments(); renderPageNav(); }
+  else if (view === "stats")     { renderStats();    renderPageNav(); }
+  else if (view === "live-match") renderLiveMatch();
+}
+
 function renderDashboard() {
   document.getElementById('app').innerHTML = `
     <div class="dashboard">
       <div class="dashboard-buttons">
-        <button onclick="openStartMatch()" ${tournaments.length<1?"disabled":""}>Start Match</button>
+        <button onclick="openStartMatch()" ${tournaments.length<1 ? "disabled":""}>Start Match</button>
         <button onclick="openNewTournament()">New Tournament</button>
       </div>
       <section>
         <h3>Active Tournaments</h3>
-        <div id="active-tournaments">
-          ${tournaments.length<1? `<div class="list-card">No tournaments</div>` :
-            tournaments.map((t,i)=>`
-              <div class="list-card" style="justify-content:space-between;">
-                <span>${t.name} (${t.format}-pt)</span>
-                <button onclick="viewTournament(${i})">View</button>
-              </div>
-            `).join('')}
+        <div class="dashboard-table-scroll">
+          ${
+            tournaments.filter(t=>!t.ended).length < 1
+              ? `<div class="list-card">No active tournaments</div>`
+              : tournaments
+                  .map((t,i)=>!t.ended ? `
+                    <div class="list-card" style="justify-content:space-between;">
+                      <span>${t.name} (${t.format}-pt)</span>
+                      <button onclick="viewTournament(${i})">View</button>
+                    </div>` : ''
+                  ).join('')
+          }
         </div>
       </section>
       <section>
         <h3>Top Players</h3>
-        <div id="top-players-list">
-        ${
-          players.length<1 ?
-          `<div class="list-card"><span class="icon">🥇</span>No player statistics yet</div>`
-          :
-          getTopPlayers().map((p,i)=>
-            `<div class="list-card" style="align-items:center;">
-              <span class="rank">#${i+1}</span>
-              <b>${p.name}</b>&ensp;|&ensp;<span style="font-size:0.95em">${p.wins}W, ${p.losses}L</span>
-              <span style="margin-left:auto;font-size:0.9em;">${Math.round(100*p.winRate)}%</span>
-            </div>`
-          ).join('')
-        }
+        <div class="dashboard-table-scroll">
+          <div id="top-players-list">
+            ${
+              players.length<1 ?
+              `<div class="list-card"><span class="icon">🥇</span>No player statistics yet</div>`
+              :
+              getTopPlayers().map((p,i)=>
+                `<div class="list-card" style="align-items:center;">
+                  <span class="rank">#${i+1}</span>
+                  <b>${p.name}</b>&ensp;|&ensp;<span style="font-size:0.95em">${p.wins}W, ${p.losses}L</span>
+                  <span style="margin-left:auto;font-size:0.9em;">${Math.round(100*p.winRate)}%</span>
+                </div>`
+              ).join('')
+            }
+          </div>
+        </div>
+      </section>
+      <section>
+        <h3>Tournament Wins</h3>
+        <div class="dashboard-table-scroll">
+          <div id="tournament-wins-list">
+            ${renderTournamentWinsTable()}
+          </div>
         </div>
       </section>
       <div id="page-nav"></div>
     </div>
   `;
+}
+function renderTournamentWinsTable() {
+  if (players.length === 0) return `<div class="list-card">No tournaments played yet.</div>`;
+  const sorted = players.slice().sort((a,b)=>(b.tournamentsWon||0)-(a.tournamentsWon||0));
+  return sorted.map((p,i) =>
+    `<div class="list-card" style="align-items:center;">
+      <span class="rank">#${i+1}</span>
+      <b>${p.name}</b>
+      <span style="margin-left:auto;font-size:0.98em;">🏅 ${p.tournamentsWon||0}</span>
+    </div>`
+  ).join('');
 }
 function getTopPlayers() {
   return players
@@ -91,7 +119,6 @@ function getTopPlayers() {
     .slice(0,5);
 }
 
-// --- Tournament Creation & Match Scheduling
 function openNewTournament() {
   showModal(`
     <h2>Create Tournament</h2>
@@ -146,34 +173,82 @@ function goToScheduleMatches() {
   }
   window.finalizeTournament = function(){
     if(matches.length<1) { alert("Add at least one match!"); return;}
-    tournaments.push({name, format, players: selectedPlayers, matches});
+    tournaments.push({name, format, players: selectedPlayers, matches, ended:false});
     save('beyblade_tournaments', tournaments);
     hideModal(); render();
   }
   updateMatchList();
 }
 
-function viewTournament(idx) {
-  const t = tournaments[idx];
+function openEditTournament(tIdx) {
   showModal(`
-    <h2>${t.name}</h2>
-    <p>Format: ${t.format}-pt<br>
-      <b>Players: </b>${t.players.map(i=>players[i].name).join(", ")}
-    </p>
-    <hr>
-    <b>Results:</b>
-    <ul style="padding-left:18px;">
-      ${t.matches.filter(m=>m.played).length<1?"<li>No matches played yet</li>":t.matches.filter(m=>m.played).map(
-        m=>`<li>${players[m.p1].name} vs ${players[m.p2].name} — Winner: <b>${players[m.winner].name}</b> (${m.score1} - ${m.score2})</li>`
-      ).join('')}
-    </ul>
-    <div style="text-align:right;margin-top:18px;">
-      <button onclick="hideModal()">Close</button>
+    <h2>Tournament Complete</h2>
+    <div class="list-card" style="margin-bottom:9px;">All scheduled matches have been played.</div>
+    <div style="text-align:center;">
+      <button onclick="addMoreMatches(${tIdx})">➕ Add More Matches</button>
+      <button onclick="endTournament(${tIdx})">🏆 End Tournament</button>
+      <button onclick="hideModal()">Cancel</button>
     </div>
   `);
 }
+function addMoreMatches(tIdx) {
+  hideModal();
+  showModal(`
+    <h2>Add More Matches</h2>
+    <form id="addMoreForm">
+      <label>Player 1: <select id="addmore-p1">${tournaments[tIdx].players.map(i=>`<option value="${i}">${players[i].name}</option>`)}</select></label>
+      <label>Player 2: <select id="addmore-p2">${tournaments[tIdx].players.map(i=>`<option value="${i}">${players[i].name}</option>`)}</select></label>
+      <button>Add Match</button>
+    </form>
+    <ul id="addmore-list" style="margin:10px 0 7px 0;"></ul>
+    <div style="text-align:right;">
+      <button onclick="hideModal()">Done</button>
+    </div>
+  `);
+  let added = [];
+  document.getElementById('addMoreForm').onsubmit = function(e){
+    e.preventDefault();
+    let p1 = +document.getElementById('addmore-p1').value;
+    let p2 = +document.getElementById('addmore-p2').value;
+    if(p1===p2) { alert("Cannot schedule match vs. self"); return;}
+    tournaments[tIdx].matches.push({p1, p2, played:false, winner:null, score1:0, score2:0});
+    added.push(`${players[p1].name} vs ${players[p2].name}`);
+    save('beyblade_tournaments', tournaments);
+    updateAddMoreList();
+  };
+  function updateAddMoreList() {
+    document.getElementById('addmore-list').innerHTML =
+      (added.length>0?
+      added.map(m=>`<li>${m}</li>`).join(''):'<li>No matches added this round.</li>');
+  }
+  updateAddMoreList();
+}
+function endTournament(tIdx) {
+  hideModal();
+  let tournament = tournaments[tIdx];
+  let ploptions = tournament.players.map(i=>`<option value="${i}">${players[i].name}</option>`).join('');
+  showModal(`
+    <h2>End Tournament</h2>
+    <label>Select Winner:
+      <select id="end-tourney-player">${ploptions}</select>
+    </label>
+    <div style="text-align:right;padding-top:13px;">
+      <button onclick="confirmEndTournament(${tIdx})">Confirm Winner</button>
+      <button onclick="hideModal()">Cancel</button>
+    </div>
+  `);
+}
+function confirmEndTournament(tIdx) {
+  let winnerIdx = +document.getElementById('end-tourney-player').value;
+  tournaments[tIdx].ended = true;
+  tournaments[tIdx].winner = winnerIdx;
+  players[winnerIdx].tournamentsWon = (players[winnerIdx].tournamentsWon||0)+1;
+  save('beyblade_tournaments', tournaments);
+  save('beyblade_players', players);
+  hideModal();
+  view="dashboard"; render();
+}
 
-// --- "Start Match" flow (modal + opens live match UI)
 function openStartMatch() {
   if (tournaments.length < 1) {
     alert("No tournaments available. Please create a tournament first.");
@@ -189,6 +264,7 @@ function openStartMatch() {
     <label id="match-select-label" style="display:block;"></label>
     <div style="text-align:right;margin-top:15px;">
       <button id="start-match-btn" style="display:none;">Start Match</button>
+      <button id="edit-tournament-btn" style="display:none;">Edit Tournament</button>
       <button onclick="hideModal()">Cancel</button>
     </div>
   `);
@@ -196,27 +272,34 @@ function openStartMatch() {
   const tournamentSelect = document.getElementById('sel-tournament');
   const matchLabel = document.getElementById('match-select-label');
   const startBtn = document.getElementById('start-match-btn');
+  const editBtn = document.getElementById('edit-tournament-btn');
 
   function updateMatchDropdown() {
     const tIdx = +tournamentSelect.value;
     const t = tournaments[tIdx];
+    if (t.ended) {
+      matchLabel.innerHTML = "<b>This tournament is ended.</b>";
+      startBtn.style.display = "none";
+      editBtn.style.display = "none";
+      return;
+    }
     const unused = t.matches.filter(m => !m.played);
     if (unused.length === 0) {
       matchLabel.innerHTML = `<i>All matches played</i>`;
       startBtn.style.display = 'none';
+      editBtn.style.display = 'inline-block';
+      editBtn.onclick = ()=>{hideModal(); openEditTournament(tIdx);};
       return;
     }
     matchLabel.innerHTML = `Select Match: <select id="sel-match">
       ${unused.map(m => `<option value="${t.matches.indexOf(m)}">${players[m.p1].name} vs ${players[m.p2].name}</option>`).join('')}
     </select>`;
     startBtn.style.display = 'inline-block';
+    editBtn.style.display = 'none';
 
     startBtn.onclick = () => {
       const matchSelect = document.getElementById('sel-match');
-      if (!matchSelect) {
-        alert("No match selected.");
-        return;
-      }
+      if (!matchSelect) { alert("No match selected."); return; }
       const matchIdx = +matchSelect.value;
       const match = t.matches[matchIdx];
       liveMatch = {
@@ -234,12 +317,10 @@ function openStartMatch() {
       render();
     };
   }
-
   tournamentSelect.addEventListener('change', updateMatchDropdown);
   updateMatchDropdown();
 }
 
-// --- Live Match UI
 function renderLiveMatch() {
   if (!liveMatch || typeof liveMatch.p1 === "undefined" || typeof liveMatch.p2 === "undefined") {
     view = "dashboard"; render(); return;
@@ -318,7 +399,6 @@ function updateMatchStats(winner, loser) {
 }
 function endLiveMatch() { liveMatch = null; view = "dashboard"; render(); }
 
-// --- Players Page
 function renderPlayers() {
   document.getElementById('app').innerHTML = `
     <div class="content-page">
@@ -335,6 +415,7 @@ function renderPlayers() {
           <div class="list-card" style="gap:0.7rem;justify-content:space-between;">
             <b>${p.name}</b>
             <span>${p.wins} W / ${p.losses} L</span>
+            <span style="color:#ffd600;font-size:0.95em;font-weight:600;">🏅 ${p.tournamentsWon||0}</span>
             <button class="danger" onclick="removePlayer(${i})">Remove</button>
           </div>
         `).join('')
@@ -344,7 +425,6 @@ function renderPlayers() {
     </div>
   `;
 }
-
 function openAddPlayer() {
   showModal(`
     <h2>Add New Player</h2>
@@ -359,7 +439,7 @@ function openAddPlayer() {
 function doAddPlayer() {
   const v = document.getElementById('new-player-name').value.trim();
   if (!v) { alert("Enter a player name!"); return; }
-  players.push({name:v, wins:0, losses:0});
+  players.push({name:v, wins:0, losses:0, tournamentsWon:0});
   save('beyblade_players', players);
   hideModal();
   render();
@@ -372,7 +452,6 @@ function removePlayer(idx) {
   }
 }
 
-// --- Tournaments Page
 function renderTournaments() {
   document.getElementById('app').innerHTML = `
     <div class="content-page">
@@ -384,9 +463,12 @@ function renderTournaments() {
         tournaments.map((t,i)=>`
           <div class="list-card" style="flex-direction:column;align-items:flex-start;">
             <b>${t.name}</b> <span>Format: ${t.format}-pt</span>
-            <span style="font-size:0.95em;color:var(--icon);margin-top:7px;">
+            <span style="font-size:0.95em;color:var(--accent);margin-top:7px;">
             ${t.players.length} players | ${t.matches.filter(m=>m.played).length}/${t.matches.length} matches played
+            ${t.ended ? `<span style="color:#e55;margin-left:12px;">(ENDED)</span>` : ''}
             </span>
+            ${t.ended && typeof t.winner!=="undefined"
+                ? `<span><b>Winner:</b> ${players[t.winner]?.name||'?'}</span>` : ''}
             <span>
               <button onclick="viewTournament(${i})">View</button>
             </span>
@@ -398,8 +480,6 @@ function renderTournaments() {
   `;
 }
 
-
-// --- Stats Page
 function renderStats() {
   document.getElementById('app').innerHTML = `
     <div class="content-page">
@@ -410,7 +490,7 @@ function renderStats() {
         `<b>All Player Records:</b>
         <table style="width:100%;margin-top:14px; font-size:0.97em;">
           <tr style="background:var(--bg);font-weight:bold;">
-            <td>Name</td><td>Wins</td><td>Losses</td><td>Win Rate</td>
+            <td>Name</td><td>Wins</td><td>Losses</td><td>Win Rate</td><td style="text-align:center;">🏅</td>
           </tr>
           ${players.map(p=>`
               <tr>
@@ -418,6 +498,7 @@ function renderStats() {
                 <td>${p.wins}</td>
                 <td>${p.losses}</td>
                 <td>${Math.round(100*p.wins/(p.wins+p.losses||1))}%</td>
+                <td style="text-align:center;">${p.tournamentsWon||0}</td>
               </tr>
             `).join('')
           }
@@ -440,7 +521,7 @@ function renderStats() {
   `;
 }
 
-// --- Modal
+// --- Modal helpers
 function showModal(html="") {
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal').classList.remove('hidden');
@@ -455,5 +536,24 @@ function hideModal() {
   }
 }
 
-// --- Start the app
+function viewTournament(idx) {
+  const t = tournaments[idx];
+  showModal(`
+    <h2>${t.name}</h2>
+    <p>Format: ${t.format}-pt<br>
+      <b>Players: </b>${t.players.map(i=>players[i].name).join(", ")}
+    </p>
+    <hr>
+    <b>Results:</b>
+    <ul style="padding-left:18px;">
+      ${t.matches.filter(m=>m.played).length<1?"<li>No matches played yet</li>":t.matches.filter(m=>m.played).map(
+        m=>`<li>${players[m.p1].name} vs ${players[m.p2].name} — Winner: <b>${players[m.winner].name}</b> (${m.score1} - ${m.score2})</li>`
+      ).join('')}
+    </ul>
+    <div style="text-align:right;margin-top:18px;">
+      <button onclick="hideModal()">Close</button>
+    </div>
+  `);
+}
+
 render();

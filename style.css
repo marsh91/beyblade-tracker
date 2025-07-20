@@ -20,7 +20,6 @@ body {
   background: linear-gradient(135deg, rgba(32,0,32,0.78) 0%, rgba(48,7,24,0.63) 100%), url('20240412-122722_0000-transformed-101951.jpg') no-repeat center center fixed;
   background-size: cover;
 }
-
 #app {
   background: rgba(34, 0, 25, 0.80);
   box-shadow: var(--shadow);
@@ -29,15 +28,12 @@ body {
   margin: 24px auto 0 auto;
   max-width: 420px;
 }
-
 h1, h2, h3 {
   color: var(--bright-yellow);
   text-shadow: 0 2px 8px #a259ff80, 0 0px 2px #0a0606;
   font-family: 'Segoe UI Semibold', 'Arial Black', Arial, sans-serif;
   letter-spacing: 1px;
 }
-
-/* Button and main action colors aligned to Beyblade color theme */
 button, .btn {
   background: linear-gradient(90deg, var(--highlight-red), var(--fiery-orange) 85%);
   color: var(--text-light);
@@ -73,6 +69,15 @@ button[disabled] {
   box-shadow: 0 1.5px 7px #ffa60066;
   color: var(--text-light);
 }
+.rank {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 999px;
+  padding: 3.5px 12px;
+  margin-right: 0.7rem;
+  font-weight: 600;
+  font-size: 1em;
+}
 .player-score {
   font-size: 2.4em;
   color: var(--bright-yellow);
@@ -95,38 +100,40 @@ input::placeholder {
   color: #f8cac6;
   opacity: 0.7;
 }
-.score-btns button.spin {
-  background: linear-gradient(90deg, #a259ff 30%, #e44628 90%);
+/* ----- SCROLLABLE CONTAINERS ----- */
+.dashboard-table-scroll,
+.tab-table-scroll {
+  max-height: 225px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  scrollbar-color: #ffd600 #1a1012;
+  scrollbar-width: thin;
 }
-.score-btns button.burst {
-  background: linear-gradient(90deg, #fd7272 40%, #f0e227 95%);
-  color: #362100;
+.dashboard-table-scroll::-webkit-scrollbar,
+.tab-table-scroll::-webkit-scrollbar {
+  width: 7px;
 }
-.score-btns button.xtreme {
-  background: linear-gradient(90deg, #c1082e 20%, #ffd600 100%);
-  color: #2d1611;
+.dashboard-table-scroll::-webkit-scrollbar-thumb,
+.tab-table-scroll::-webkit-scrollbar-thumb {
+  background: #ffd600;
+  border-radius: 8px;
 }
-.winner-banner {
-  background: linear-gradient(90deg, #ffd600 50%, #c1082e 100%);
-  color: #320702;
-  text-shadow: 0 2px 12px #fff045;
-  border: 2px solid #e44628;
-  font-size: 1.22em;
-  padding: 1.2em 0.2em 0.8em 0.2em;
+.dashboard-table-scroll::-webkit-scrollbar-track,
+.tab-table-scroll::-webkit-scrollbar-track {
+  background: #210818;
 }
-.trophy {
-  color: #ffd600;
-  font-size: 2.25rem;
-  margin-bottom: 13px;
-}
-h1, h2, h3, .page-nav button, .player-score, input, select {
-  font-family: 'Segoe UI Semibold', 'Arial Black', Arial, sans-serif;
-}
+
 @media (max-width: 600px) {
   #app { max-width: 100vw !important; border-radius: 0; }
   .dashboard, .content-page { padding: 1rem 0.18rem 0.7rem 0.18rem !important; }
+  .page-nav-row button { 
+    font-size: 1.03em;
+    padding: 15px 0;
+    width: 44vw;
+    min-width: 90px;
+  }
+  .page-nav { gap: 0.18em; }
 }
-
 .page-nav {
   margin: 23px 0 10px 0;
   display: flex;
@@ -157,17 +164,6 @@ h1, h2, h3, .page-nav button, .player-score, input, select {
   background: var(--accent);
   color: var(--metal-red);
 }
-@media (max-width: 600px) {
-  .page-nav-row button {
-    font-size: 1.03em;
-    padding: 15px 0;
-    width: 44vw;
-    min-width: 90px;
-  }
-  .page-nav { gap: 0.18em; }
-}
-
-/* Live Match UI */
 .live-match {
   padding: 10px 0 18px;
 }
@@ -196,8 +192,6 @@ h1, h2, h3, .page-nav button, .player-score, input, select {
   display: flex; flex-direction: column; gap:9px; width:100%;
 }
 .score-btns button:disabled { opacity:0.36; }
-
-/* Modal and Card Utility */
 .modal-bg {
   position:fixed; top:0; left:0; right:0; bottom:0;
   background:rgba(78,22,108,0.36); z-index:18;
@@ -225,7 +219,6 @@ h1, h2, h3, .page-nav button, .player-score, input, select {
   }
 }
 .hidden { display: none; }
-
 table { border-collapse: collapse; width: 100%; color: var(--bright-yellow);}
 td, th { padding: 0.27em 0.22em; text-align: left; }
 @media (max-width: 600px) {
@@ -234,5 +227,4 @@ td, th { padding: 0.27em 0.22em; text-align: left; }
 }
 ::-webkit-scrollbar { width:7px;}
 ::-webkit-scrollbar-thumb {background:#e0dcfa;}
-
 hr { border: 0; border-top: 1.5px solid #c1082e; margin: 1.08rem 0; }
